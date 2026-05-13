@@ -34,7 +34,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white">
+      <body className="min-h-screen bg-gradient-to-br from-[#1a0a2e] via-[#2d0a3e] to-[#1a0a2e] text-white">
         {children}
       </body>
     </html>

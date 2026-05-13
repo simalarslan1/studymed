@@ -307,179 +307,120 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-[#0f0818]">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-slate-900/80 backdrop-blur border-b border-white/10 z-10">
+      <header className="flex items-center justify-between px-4 py-3 bg-black/30 backdrop-blur-xl border-b border-white/8 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-teal-500 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-500/30">
             <span className="text-sm">📚</span>
           </div>
-          <span className="font-bold text-white">StudyMed</span>
+          <span className="font-bold bg-gradient-to-r from-pink-300 to-purple-300 bg-clip-text text-transparent">StudyMed</span>
           {connectionStatus === 'connected' && (
-            <div className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-3 py-1">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-300 text-sm font-mono">{formatTime(studyTime)}</span>
+            <div className="flex items-center gap-2 bg-pink-500/10 border border-pink-500/20 rounded-full px-3 py-1">
+              <div className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
+              <span className="text-pink-300 text-sm font-mono">{formatTime(studyTime)}</span>
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Connection status badge */}
-          <div
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${
-              connectionStatus === 'connected'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : connectionStatus === 'connecting'
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                : connectionStatus === 'peer-left'
-                ? 'bg-red-500/10 border-red-500/30 text-red-300'
-                : 'bg-slate-500/10 border-slate-500/30 text-slate-400'
-            }`}
-          >
-            <div
-              className={`w-1.5 h-1.5 rounded-full ${
-                connectionStatus === 'connected'
-                  ? 'bg-emerald-400 animate-pulse'
-                  : connectionStatus === 'connecting'
-                  ? 'bg-amber-400 animate-pulse'
-                  : connectionStatus === 'peer-left'
-                  ? 'bg-red-400'
-                  : 'bg-slate-500'
-              }`}
-            />
-            {connectionStatus === 'connected'
-              ? 'Bağlandı'
-              : connectionStatus === 'connecting'
-              ? 'Bağlanıyor...'
-              : connectionStatus === 'peer-left'
-              ? 'Ayrıldı'
-              : 'Bekleniyor'}
+          <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${
+            connectionStatus === 'connected' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+            : connectionStatus === 'connecting' ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+            : connectionStatus === 'peer-left' ? 'bg-red-500/10 border-red-500/20 text-red-300'
+            : 'bg-white/5 border-white/10 text-white/40'
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-emerald-400 animate-pulse'
+              : connectionStatus === 'connecting' ? 'bg-amber-400 animate-pulse'
+              : connectionStatus === 'peer-left' ? 'bg-red-400' : 'bg-white/30'
+            }`} />
+            {connectionStatus === 'connected' ? 'Bağlandı' : connectionStatus === 'connecting' ? 'Bağlanıyor...' : connectionStatus === 'peer-left' ? 'Ayrıldı' : 'Bekleniyor'}
           </div>
-
-          {/* Share buttons */}
-          <button
-            onClick={handleCopyLink}
-            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs transition-all"
-          >
+          <button onClick={handleCopyLink} className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/8 text-white/50 hover:text-white text-xs transition-all">
             {linkCopied ? '✅' : '🔗'} {linkCopied ? 'Kopyalandı' : 'Link'}
           </button>
-          <button
-            onClick={handleWhatsAppShare}
-            className="px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-300 text-xs transition-all"
-          >
-            💬 WhatsApp
+          <button onClick={handleWhatsAppShare} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 text-xs transition-all">
+            💬
           </button>
         </div>
       </header>
 
       {/* Video Area */}
-      <div className="flex-1 relative bg-slate-950 overflow-hidden">
+      <div className="flex-1 relative overflow-hidden bg-[#0f0818]">
         {mediaError ? (
           <div className="absolute inset-0 flex items-center justify-center p-8">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-8 max-w-md text-center">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-8 max-w-md text-center">
               <div className="text-5xl mb-4">🎥</div>
               <h3 className="text-red-300 font-semibold text-lg mb-2">Kamera Erişimi Gerekli</h3>
-              <p className="text-slate-400 text-sm">{mediaError}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="mt-4 px-6 py-2 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 hover:bg-red-500/30 transition-all"
-              >
+              <p className="text-white/40 text-sm">{mediaError}</p>
+              <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2.5 bg-red-500/20 border border-red-500/20 rounded-2xl text-red-300 hover:bg-red-500/30 transition-all">
                 Sayfayı Yenile
               </button>
             </div>
           </div>
         ) : (
           <>
-            {/* Remote video (main, full screen) */}
             <div className="absolute inset-0">
-              {connectionStatus === 'waiting' || connectionStatus === 'connecting' ? (
+              {(connectionStatus === 'waiting' || connectionStatus === 'connecting') && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="relative">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/20 to-teal-500/20 border-2 border-indigo-400/30 flex items-center justify-center">
-                      <span className="text-5xl">
-                        {connectionStatus === 'connecting' ? '🔗' : '🕐'}
-                      </span>
+                  <div className="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative mb-6">
+                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-pink-500/20 to-purple-500/20 border border-pink-500/20 flex items-center justify-center">
+                      <span className="text-5xl">{connectionStatus === 'connecting' ? '🔗' : '🕐'}</span>
                     </div>
-                    {(connectionStatus === 'waiting' || connectionStatus === 'connecting') && (
-                      <div className="absolute -inset-4 rounded-full border-2 border-indigo-400/20 animate-ping" />
-                    )}
+                    <div className="absolute -inset-3 rounded-3xl border border-pink-500/15 animate-ping" />
                   </div>
-                  <p className="mt-6 text-white text-xl font-medium">
-                    {connectionStatus === 'connecting' ? 'Bağlanıyor...' : 'Arkadaşın bekleniyor... 🕐'}
+                  <p className="text-white text-xl font-semibold">
+                    {connectionStatus === 'connecting' ? 'Bağlanıyor...' : 'Arkadaşın bekleniyor'}
                   </p>
-                  <p className="mt-2 text-slate-400 text-sm">
-                    {connectionStatus === 'connecting'
-                      ? 'WebRTC bağlantısı kuruluyor'
-                      : 'Oda linkini arkadaşınla paylaş'}
+                  <p className="text-white/30 text-sm mt-2">
+                    {connectionStatus === 'connecting' ? 'Bağlantı kuruluyor' : 'Davet gönderildi, katılmasını bekle'}
                   </p>
                   {connectionStatus === 'waiting' && (
                     <div className="mt-6 flex gap-3">
-                      <button
-                        onClick={handleCopyLink}
-                        className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm text-slate-300 transition-all"
-                      >
-                        {linkCopied ? '✅ Kopyalandı!' : '📋 Link Kopyala'}
+                      <button onClick={handleCopyLink} className="px-4 py-2.5 bg-white/8 border border-white/10 rounded-2xl text-sm text-white/60 hover:text-white transition-all">
+                        {linkCopied ? '✅ Kopyalandı' : '📋 Link Kopyala'}
                       </button>
-                      <button
-                        onClick={handleWhatsAppShare}
-                        className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-xl text-sm text-green-300 transition-all"
-                      >
-                        💬 WhatsApp'ta Paylaş
+                      <button onClick={handleWhatsAppShare} className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-sm text-emerald-300 transition-all">
+                        💬 WhatsApp
                       </button>
                     </div>
                   )}
                 </div>
-              ) : connectionStatus === 'peer-left' ? (
+              )}
+
+              {connectionStatus === 'peer-left' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <div className="text-6xl mb-4">😔</div>
-                  <h3 className="text-white text-xl font-semibold">
-                    {peerName || 'Arkadaşın'} ayrıldı
-                  </h3>
-                  <p className="text-slate-400 mt-2">Görüntülü görüşme sona erdi</p>
-                  <p className="text-slate-500 text-sm mt-1">
-                    Toplam ders süresi: {formatTime(studyTime)}
-                  </p>
-                  <button
-                    onClick={handleLeave}
-                    className="mt-6 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-medium transition-all"
-                  >
+                  <h3 className="text-white text-xl font-semibold">{peerName || 'Arkadaşın'} ayrıldı</h3>
+                  <p className="text-white/40 mt-2 text-sm">Toplam süre: {formatTime(studyTime)}</p>
+                  <button onClick={handleLeave} className="mt-6 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl text-white font-medium shadow-lg shadow-pink-500/25 transition-all hover:from-pink-500 hover:to-purple-500">
                     Ana Sayfaya Dön
                   </button>
                 </div>
-              ) : null}
+              )}
 
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className={`w-full h-full object-cover ${connectionStatus !== 'connected' ? 'hidden' : ''}`}
-              />
+              <video ref={remoteVideoRef} autoPlay playsInline className={`w-full h-full object-cover ${connectionStatus !== 'connected' ? 'hidden' : ''}`} />
 
               {connectionStatus === 'connected' && peerName && (
-                <div className="absolute bottom-24 left-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <div className="absolute bottom-24 left-4 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5 flex items-center gap-2 border border-white/10">
+                  <div className="w-2 h-2 rounded-full bg-pink-400" />
                   <span className="text-white text-sm font-medium">{peerName}</span>
                 </div>
               )}
             </div>
 
-            {/* Local video (picture-in-picture) */}
-            <div className="absolute bottom-20 right-4 w-32 h-24 sm:w-44 sm:h-32 rounded-xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-800">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${isCameraOff ? 'opacity-0' : ''}`}
-              />
+            {/* Local video pip */}
+            <div className="absolute bottom-20 right-4 w-32 h-24 sm:w-44 sm:h-32 rounded-2xl overflow-hidden border border-pink-500/20 shadow-2xl shadow-pink-500/10 bg-[#1a0a2e]">
+              <video ref={localVideoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${isCameraOff ? 'opacity-0' : ''}`} />
               {isCameraOff && (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+                <div className="absolute inset-0 flex items-center justify-center bg-[#1a0a2e]">
                   <span className="text-2xl">📷</span>
                 </div>
               )}
-              <div className="absolute bottom-1 left-2 text-white text-xs font-medium drop-shadow">
-                {userName}
-                {isMuted && ' 🔇'}
+              <div className="absolute bottom-1 left-2 text-white/70 text-xs font-medium drop-shadow">
+                {userName}{isMuted && ' 🔇'}
               </div>
             </div>
           </>
@@ -487,17 +428,11 @@ export default function RoomPage() {
       </div>
 
       {/* Controls */}
-      <div className="bg-slate-900/90 backdrop-blur border-t border-white/10 px-4 py-4">
-        <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
-          {/* Mute */}
+      <div className="bg-black/40 backdrop-blur-xl border-t border-white/8 px-4 py-4">
+        <div className="flex items-center justify-center gap-4 max-w-xs mx-auto">
           <button
             onClick={toggleMute}
-            title={isMuted ? 'Sesi Aç' : 'Sesi Kapat'}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-              isMuted
-                ? 'bg-red-500/20 border-2 border-red-500 text-red-400 hover:bg-red-500/30'
-                : 'bg-white/10 border border-white/20 text-slate-300 hover:bg-white/20'
-            }`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 border border-red-500/40 text-red-400' : 'bg-white/8 border border-white/10 text-white/60 hover:bg-white/15 hover:text-white'}`}
           >
             {isMuted ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -511,15 +446,9 @@ export default function RoomPage() {
             )}
           </button>
 
-          {/* Camera */}
           <button
             onClick={toggleCamera}
-            title={isCameraOff ? 'Kamerayı Aç' : 'Kamerayı Kapat'}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-              isCameraOff
-                ? 'bg-red-500/20 border-2 border-red-500 text-red-400 hover:bg-red-500/30'
-                : 'bg-white/10 border border-white/20 text-slate-300 hover:bg-white/20'
-            }`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isCameraOff ? 'bg-red-500/20 border border-red-500/40 text-red-400' : 'bg-white/8 border border-white/10 text-white/60 hover:bg-white/15 hover:text-white'}`}
           >
             {isCameraOff ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -533,50 +462,21 @@ export default function RoomPage() {
             )}
           </button>
 
-          {/* Leave */}
           <button
             onClick={handleLeave}
-            title="Odadan Ayrıl"
-            className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/30 transition-all"
+            className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/30 transition-all"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
             </svg>
           </button>
 
-          {/* Share buttons (mobile-friendly compact) */}
-          <button
-            onClick={handleCopyLink}
-            title="Link Kopyala"
-            className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-slate-300 transition-all"
-          >
-            {linkCopied ? (
-              <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            )}
+          <button onClick={handleCopyLink} className="w-12 h-12 rounded-2xl bg-white/8 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/15 transition-all">
+            {linkCopied
+              ? <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+              : <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            }
           </button>
-
-          {/* WhatsApp */}
-          <button
-            onClick={handleWhatsAppShare}
-            title="WhatsApp'ta Paylaş"
-            className="w-12 h-12 rounded-full bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 flex items-center justify-center text-green-400 transition-all"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="text-center mt-2">
-          <p className="text-slate-600 text-xs">
-            Oda: {roomId.slice(0, 8)}...
-          </p>
         </div>
       </div>
     </div>

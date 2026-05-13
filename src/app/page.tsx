@@ -16,30 +16,17 @@ interface ActiveInvite {
 }
 
 async function subscribeToPush(vapidPublicKey: string): Promise<PushSubscription | null> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Push notifications not supported');
-    return null;
-  }
-
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
   try {
     const registration = await navigator.serviceWorker.ready;
-    // Convert base64url to Uint8Array manually to satisfy TypeScript
     const padding = '='.repeat((4 - (vapidPublicKey.length % 4)) % 4);
     const base64 = (vapidPublicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = window.atob(base64);
     const keyData = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      keyData[i] = rawData.charCodeAt(i);
-    }
-    // Use the raw ArrayBuffer directly (avoids SharedArrayBuffer type mismatch)
+    for (let i = 0; i < rawData.length; ++i) keyData[i] = rawData.charCodeAt(i);
     const keyBuffer = keyData.buffer.slice(keyData.byteOffset, keyData.byteOffset + keyData.byteLength);
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: keyBuffer,
-    });
-    return subscription;
-  } catch (err) {
-    console.error('Push subscription failed:', err);
+    return await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBuffer });
+  } catch {
     return null;
   }
 }
@@ -53,21 +40,17 @@ export default function HomePage() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [activeInvite, setActiveInvite] = useState<ActiveInvite | null>(null);
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
   const [isLoading, setIsLoading] = useState(false);
   const [invitedFriend, setInvitedFriend] = useState<string | null>(null);
-  const [roomLinkCopied, setRoomLinkCopied] = useState(false);
-  const [generatedRoomLink, setGeneratedRoomLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [generatedRoomLink, setGeneratedRoomLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch('/api/users');
-      const data = await res.json();
-      setUsers(data);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    }
+      setUsers(await res.json());
+    } catch {}
   }, []);
 
   const initSocket = useCallback((name: string) => {
@@ -75,27 +58,11 @@ export default function HomePage() {
       socketInstance.emit('register', name);
       return;
     }
-
     const socket = io({ path: '/socket.io' });
     socketInstance = socket;
-
-    socket.on('connect', () => {
-      console.log('Socket connected:', socket.id);
-      socket.emit('register', name);
-    });
-
-    socket.on('invite', (data: ActiveInvite) => {
-      console.log('Received invite:', data);
-      setActiveInvite(data);
-    });
-
-    socket.on('users-update', (updatedUsers: User[]) => {
-      setUsers(updatedUsers);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Socket disconnected');
-    });
+    socket.on('connect', () => socket.emit('register', name));
+    socket.on('invite', (data: ActiveInvite) => setActiveInvite(data));
+    socket.on('users-update', (updatedUsers: User[]) => setUsers(updatedUsers));
   }, []);
 
   useEffect(() => {
@@ -106,14 +73,6 @@ export default function HomePage() {
       initSocket(storedName);
       fetchUsers();
     }
-
-    if ('Notification' in window) {
-      setNotifPermission(Notification.permission);
-    }
-
-    return () => {
-      // Don't disconnect on unmount — needed for invite notifications
-    };
   }, [initSocket, fetchUsers]);
 
   useEffect(() => {
@@ -124,55 +83,32 @@ export default function HomePage() {
   }, [isRegistered, fetchUsers]);
 
   const handleRegister = async () => {
-    const trimmedName = nameInput.trim();
-    if (!trimmedName) {
-      setError('Lütfen adınızı girin.');
-      return;
-    }
-
+    const name = nameInput.trim();
+    if (!name) return;
     setIsLoading(true);
     setError(null);
-
     try {
-      // Request notification permission
-      let permission: NotificationPermission = 'default';
-      if ('Notification' in window) {
-        permission = await Notification.requestPermission();
-        setNotifPermission(permission);
-      }
-
-      // Get VAPID public key
       let subscription: PushSubscription | null = null;
-      try {
-        const vapidRes = await fetch('/api/vapid-key');
-        const { publicKey } = await vapidRes.json();
-        if (permission === 'granted' && publicKey) {
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          const vapidRes = await fetch('/api/vapid-key');
+          const { publicKey } = await vapidRes.json();
           subscription = await subscribeToPush(publicKey);
         }
-      } catch (err) {
-        console.warn('Could not subscribe to push:', err);
       }
-
-      // Register user
-      const res = await fetch('/api/register', {
+      await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: trimmedName,
-          subscription: subscription ? JSON.parse(JSON.stringify(subscription)) : null,
-        }),
+        body: JSON.stringify({ name, subscription: subscription ? JSON.parse(JSON.stringify(subscription)) : null }),
       });
-
-      if (!res.ok) throw new Error('Kayıt başarısız');
-
-      localStorage.setItem('studymed-username', trimmedName);
-      setUserName(trimmedName);
+      localStorage.setItem('studymed-username', name);
+      setUserName(name);
       setIsRegistered(true);
-      initSocket(trimmedName);
+      initSocket(name);
       await fetchUsers();
-    } catch (err) {
-      setError('Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.');
-      console.error(err);
+    } catch {
+      setError('Bir hata oluştu, tekrar dene.');
     } finally {
       setIsLoading(false);
     }
@@ -181,168 +117,116 @@ export default function HomePage() {
   const handleInvite = async (friendName: string) => {
     const roomId = uuidv4();
     setInvitedFriend(friendName);
-
     try {
       await fetch('/api/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromName: userName, toName: friendName, roomId }),
       });
-      router.push(`/room/${roomId}`);
-    } catch (err) {
-      console.error('Invite failed:', err);
-      setInvitedFriend(null);
-      router.push(`/room/${roomId}`);
-    }
+    } catch {}
+    router.push(`/room/${roomId}`);
   };
 
   const handleCreateRoom = () => {
     const roomId = uuidv4();
-    const url = `${window.location.origin}/room/${roomId}`;
-    setGeneratedRoomLink(url);
+    setGeneratedRoomLink(`${window.location.origin}/room/${roomId}`);
   };
 
   const handleCopyLink = () => {
     if (generatedRoomLink) {
       navigator.clipboard.writeText(generatedRoomLink);
-      setRoomLinkCopied(true);
-      setTimeout(() => setRoomLinkCopied(false), 2000);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
     }
   };
 
-  const handleWhatsAppShare = () => {
-    if (generatedRoomLink) {
-      const text = encodeURIComponent(`📚 StudyMed'de birlikte ders çalışalım! ${generatedRoomLink}`);
-      window.open(`https://wa.me/?text=${text}`, '_blank');
-    }
-  };
+  const onlineUsers = users.filter(u => u.online && u.name !== userName);
+  const offlineUsers = users.filter(u => !u.online && u.name !== userName);
 
-  const handleJoinRoom = (roomId: string) => {
-    setActiveInvite(null);
-    router.push(`/room/${roomId}`);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('studymed-username');
-    setUserName('');
-    setIsRegistered(false);
-    setUsers([]);
-    if (socketInstance) {
-      socketInstance.disconnect();
-      socketInstance = null;
-    }
-  };
-
-  const onlineUsers = users.filter((u) => u.online && u.name !== userName);
-  const offlineUsers = users.filter((u) => !u.online && u.name !== userName);
-
-  // Registration screen
   if (!isRegistered) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          {/* Logo / Header */}
+        {/* Decorative blobs */}
+        <div className="fixed top-0 left-0 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="fixed bottom-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none" />
+
+        <div className="w-full max-w-sm relative">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-teal-500 mb-4 shadow-lg shadow-indigo-500/30">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-500 to-purple-600 mb-5 shadow-2xl shadow-pink-500/40">
               <span className="text-4xl">📚</span>
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-300 to-teal-300 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-300 via-fuchsia-300 to-purple-300 bg-clip-text text-transparent">
               StudyMed
             </h1>
-            <p className="text-slate-400 mt-2 text-lg">Ders arkadaşlarınla bağlan</p>
+            <p className="text-white/50 mt-2">Birlikte daha kolay öğren</p>
           </div>
 
-          {/* Card */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-xl font-semibold text-white mb-1">Hoş geldin!</h2>
-            <p className="text-slate-400 text-sm mb-6">Başlamak için adını gir</p>
+          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl p-7 shadow-2xl">
+            <p className="text-white/70 text-sm mb-5">Adını gir ve hemen başla ✨</p>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Adın
-                </label>
-                <input
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-                  placeholder="Örn: Şimal"
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleRegister()}
+              placeholder="Adın..."
+              className="w-full px-4 py-3.5 bg-white/8 border border-white/15 rounded-2xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all mb-4"
+            />
 
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-300 text-sm">
-                  {error}
-                </div>
-              )}
+            {error && (
+              <p className="text-rose-400 text-sm mb-3 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-2">
+                {error}
+              </p>
+            )}
 
-              <button
-                onClick={handleRegister}
-                disabled={isLoading || !nameInput.trim()}
-                className="w-full py-3 px-6 bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-500 hover:to-teal-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Kaydediliyor...
-                  </>
-                ) : (
-                  <>
-                    <span>🔔</span>
-                    Bildirim İzni Ver ve Başla
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              onClick={handleRegister}
+              disabled={isLoading || !nameInput.trim()}
+              className="w-full py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-pink-500/25 transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : '✨'} {isLoading ? 'Yükleniyor...' : 'Başla'}
+            </button>
 
-            <div className="mt-6 pt-6 border-t border-white/10">
-              <div className="flex items-center gap-3 text-slate-400 text-xs">
-                <span className="text-lg">🏥</span>
-                <p>Tıp öğrencileri için güvenli, gerçek zamanlı video görüşme platformu</p>
-              </div>
-            </div>
+            <p className="text-center text-white/25 text-xs mt-4">
+              Bildirim iznine izin vererek davet alabilirsin
+            </p>
           </div>
-
-          <p className="text-center text-slate-600 text-xs mt-4">
-            Bildirimlere izin vererek arkadaşlarından davet alabilirsin
-          </p>
         </div>
       </div>
     );
   }
 
-  // Main dashboard
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      {/* Active Invite Banner */}
+    <div className="min-h-screen p-4 md:p-6">
+      {/* Decorative blobs */}
+      <div className="fixed top-0 right-0 w-80 h-80 bg-pink-500/8 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-80 h-80 bg-purple-500/8 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Invite modal */}
       {activeInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-gradient-to-br from-indigo-900 to-teal-900 border border-indigo-400/30 rounded-2xl p-8 shadow-2xl max-w-sm w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="bg-gradient-to-br from-[#2a0a3e] to-[#1a0a2e] border border-pink-500/20 rounded-3xl p-8 shadow-2xl max-w-sm w-full">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 border-2 border-indigo-400 mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 mb-4 shadow-lg shadow-pink-500/30 animate-bounce">
                 <span className="text-3xl">📚</span>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">
-                {activeInvite.fromName} ders çalışıyor!
-              </h2>
-              <p className="text-indigo-300 mb-8">
-                Seni ders çalışmaya davet ediyor
-              </p>
+              <h2 className="text-2xl font-bold text-white mb-1">{activeInvite.fromName}</h2>
+              <p className="text-pink-300 mb-7">seni ders çalışmaya davet ediyor!</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setActiveInvite(null)}
-                  className="flex-1 py-3 px-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl font-medium text-slate-300 transition-all"
+                  className="flex-1 py-3 rounded-2xl bg-white/8 border border-white/10 text-white/60 hover:bg-white/12 transition-all font-medium"
                 >
                   Şimdi Değil
                 </button>
                 <button
-                  onClick={() => handleJoinRoom(activeInvite.roomId)}
-                  className="flex-1 py-3 px-4 bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-500 hover:to-teal-500 rounded-xl font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all"
+                  onClick={() => { setActiveInvite(null); router.push(`/room/${activeInvite.roomId}`); }}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-pink-500/25 transition-all"
                 >
                   Katıl 🎓
                 </button>
@@ -352,161 +236,96 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-7">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-teal-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <span className="text-xl">📚</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-500/30">
+              <span className="text-lg">📚</span>
             </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-300 to-teal-300 bg-clip-text text-transparent">
-                StudyMed
-              </h1>
-            </div>
+            <span className="font-bold text-lg bg-gradient-to-r from-pink-300 to-purple-300 bg-clip-text text-transparent">StudyMed</span>
           </div>
           <button
-            onClick={handleLogout}
-            className="text-slate-400 hover:text-white text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all"
+            onClick={() => { localStorage.removeItem('studymed-username'); socketInstance?.disconnect(); socketInstance = null; setIsRegistered(false); setUserName(''); }}
+            className="text-white/30 hover:text-white/60 text-sm px-3 py-1.5 rounded-xl hover:bg-white/5 transition-all"
           >
             Çıkış
           </button>
         </div>
 
         {/* Greeting */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white">
-            Merhaba, {userName}! 👋
-          </h2>
-          <p className="text-slate-400 mt-1">Bugün birlikte ders çalışmaya hazır mısın?</p>
-          {notifPermission !== 'granted' && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300 text-sm">
-              <span>⚠️</span>
-              Bildirimler kapalı — davetleri kaçırabilirsin
-            </div>
-          )}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white">Merhaba, {userName}! 👋</h2>
+          <p className="text-white/40 mt-1 text-sm">Bugün birlikte ders çalışmaya hazır mısın?</p>
         </div>
 
-        {/* Create Room Card */}
-        <div className="bg-gradient-to-br from-indigo-600/20 to-teal-600/20 border border-indigo-500/30 rounded-2xl p-6 mb-6">
-          <h3 className="font-semibold text-white text-lg mb-1">Ders Çalışmaya Başla</h3>
-          <p className="text-slate-400 text-sm mb-4">Oda oluştur ve link paylaş veya arkadaşını davet et</p>
-
-          <button
-            onClick={handleCreateRoom}
-            className="w-full py-3 px-6 bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-500 hover:to-teal-500 rounded-xl font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 flex items-center justify-center gap-2"
-          >
-            <span>🎓</span>
-            Oda Linki Oluştur
-          </button>
-
-          {generatedRoomLink && (
-            <div className="mt-4 space-y-3">
-              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                <p className="text-slate-400 text-xs mb-1">Oda linki:</p>
-                <p className="text-white text-sm font-mono break-all">{generatedRoomLink}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCopyLink}
-                  className="flex-1 py-2 px-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium text-slate-300 transition-all flex items-center justify-center gap-2"
-                >
-                  {roomLinkCopied ? '✅ Kopyalandı!' : '📋 Kopyala'}
-                </button>
-                <button
-                  onClick={handleWhatsAppShare}
-                  className="flex-1 py-2 px-4 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-xl text-sm font-medium text-green-300 transition-all flex items-center justify-center gap-2"
-                >
-                  <span>💬</span> WhatsApp
-                </button>
-                <button
-                  onClick={() => router.push(generatedRoomLink.replace(window.location.origin, ''))}
-                  className="flex-1 py-2 px-4 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl text-sm font-medium text-indigo-300 transition-all flex items-center justify-center gap-2"
-                >
-                  <span>🚀</span> Katıl
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Friends List */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+        {/* Friends list */}
+        <div className="bg-white/5 backdrop-blur-xl border border-white/8 rounded-3xl p-5 mb-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-white text-lg">Ders Arkadaşları</h3>
-            <span className="text-slate-400 text-sm">{users.filter((u) => u.name !== userName).length} kişi</span>
+            <h3 className="font-semibold text-white">Ders Arkadaşları</h3>
+            <span className="text-white/30 text-xs">{users.filter(u => u.name !== userName).length} kişi</span>
           </div>
 
-          {users.filter((u) => u.name !== userName).length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">🏥</div>
-              <p className="text-slate-400">Henüz kayıtlı arkadaş yok</p>
-              <p className="text-slate-500 text-sm mt-1">Arkadaşına bu uygulamayı gönder!</p>
+          {users.filter(u => u.name !== userName).length === 0 ? (
+            <div className="text-center py-10">
+              <div className="text-5xl mb-3">🏥</div>
+              <p className="text-white/40 text-sm">Henüz başka kullanıcı yok</p>
+              <p className="text-white/20 text-xs mt-1">Arkadaşına bu uygulamayı gönder!</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {/* Online users first */}
               {onlineUsers.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Çevrimiçi ({onlineUsers.length})</p>
+                <div>
+                  <p className="text-xs text-white/25 uppercase tracking-widest mb-3">Çevrimiçi</p>
                   <div className="space-y-2">
-                    {onlineUsers.map((user) => (
+                    {onlineUsers.map(user => (
                       <button
                         key={user.name}
                         onClick={() => handleInvite(user.name)}
                         disabled={invitedFriend === user.name}
-                        className="w-full flex items-center justify-between p-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50 transition-all duration-200 group disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 hover:border-pink-400/40 hover:from-pink-500/15 hover:to-purple-500/15 transition-all group disabled:opacity-60"
                       >
                         <div className="flex items-center gap-3">
                           <div className="relative">
-                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500/40 to-teal-500/40 border border-emerald-400/30 flex items-center justify-center">
-                              <span className="text-base font-bold text-white">
-                                {user.name.charAt(0).toUpperCase()}
-                              </span>
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500/30 to-purple-500/30 border border-pink-400/20 flex items-center justify-center font-bold text-white">
+                              {user.name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-900 animate-pulse" />
+                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#1a0a2e] animate-pulse" />
                           </div>
                           <div className="text-left">
-                            <p className="font-semibold text-white">{user.name}</p>
-                            <p className="text-xs text-emerald-400">Çevrimiçi — tıkla, hemen başla</p>
+                            <p className="font-semibold text-white text-sm">{user.name}</p>
+                            <p className="text-xs text-emerald-400">Çevrimiçi · tıkla, başla</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-emerald-300 group-hover:text-white transition-colors">
+                        <span className="text-pink-300 text-sm font-medium group-hover:text-white transition-colors">
                           {invitedFriend === user.name ? (
-                            <span className="text-sm flex items-center gap-1">
-                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                            <span className="flex items-center gap-1 text-xs">
+                              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                               </svg>
-                              Davet gönderildi
+                              Gönderildi
                             </span>
-                          ) : (
-                            <span className="text-sm font-medium">Ders Çalış →</span>
-                          )}
-                        </div>
+                          ) : 'Davet Et →'}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Offline users */}
               {offlineUsers.length > 0 && (
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Çevrimdışı ({offlineUsers.length})</p>
-                  {offlineUsers.map((user) => (
-                    <div key={user.name} className="flex items-center gap-3 p-3 rounded-xl opacity-50">
-                      <div className="relative">
-                        <div className="w-10 h-10 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
-                          <span className="text-sm font-semibold text-slate-400">
-                            {user.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-slate-600 border-2 border-slate-900" />
+                <div className={onlineUsers.length > 0 ? 'mt-4' : ''}>
+                  {onlineUsers.length > 0 && <div className="border-t border-white/5 mb-3" />}
+                  <p className="text-xs text-white/25 uppercase tracking-widest mb-3">Çevrimdışı</p>
+                  {offlineUsers.map(user => (
+                    <div key={user.name} className="flex items-center gap-3 p-3 rounded-2xl opacity-40">
+                      <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center font-bold text-white/50 text-sm">
+                        {user.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-400 text-sm">{user.name}</p>
-                        <p className="text-xs text-slate-600">Çevrimdışı</p>
+                        <p className="text-white/60 text-sm font-medium">{user.name}</p>
+                        <p className="text-xs text-white/25">Çevrimdışı</p>
                       </div>
                     </div>
                   ))}
@@ -516,80 +335,57 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* Create room */}
+        <div className="bg-white/5 backdrop-blur-xl border border-white/8 rounded-3xl p-5">
+          <h3 className="font-semibold text-white mb-1 text-sm">Link ile Davet Et</h3>
+          <p className="text-white/30 text-xs mb-4">Oda oluştur, linkini WhatsApp'tan gönder</p>
+          <button
+            onClick={handleCreateRoom}
+            className="w-full py-3 rounded-2xl bg-white/8 border border-white/10 hover:bg-white/12 text-white/70 hover:text-white text-sm font-medium transition-all"
+          >
+            🔗 Oda Linki Oluştur
+          </button>
+
+          {generatedRoomLink && (
+            <div className="mt-3 space-y-2">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <p className="text-white/70 text-xs font-mono break-all">{generatedRoomLink}</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleCopyLink} className="flex-1 py-2.5 rounded-xl bg-white/8 border border-white/10 text-white/60 hover:text-white text-xs font-medium transition-all">
+                  {linkCopied ? '✅ Kopyalandı' : '📋 Kopyala'}
+                </button>
+                <button
+                  onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`📚 StudyMed'de ders çalışalım! ${generatedRoomLink}`)}`, '_blank')}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 text-xs font-medium transition-all"
+                >
+                  💬 WhatsApp
+                </button>
+                <button
+                  onClick={() => router.push(generatedRoomLink.replace(window.location.origin, ''))}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-pink-600/30 to-purple-600/30 border border-pink-500/20 text-pink-300 hover:from-pink-600/40 hover:to-purple-600/40 text-xs font-medium transition-all"
+                >
+                  🚀 Katıl
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Stats */}
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <StatCard icon="👥" label="Kayıtlı" value={users.length} />
-          <StatCard icon="🟢" label="Çevrimiçi" value={users.filter((u) => u.online).length} />
-          <StatCard icon="📚" label="Ders Odası" value={0} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UserRow({
-  user,
-  isInviting,
-  onInvite,
-}: {
-  user: User;
-  isInviting: boolean;
-  onInvite: (name: string) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all group">
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500/30 to-teal-500/30 border border-white/10 flex items-center justify-center">
-            <span className="text-sm font-semibold text-white">
-              {user.name.charAt(0).toUpperCase()}
-            </span>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="bg-white/5 border border-white/8 rounded-2xl p-4 text-center">
+            <div className="text-2xl mb-1">🟢</div>
+            <div className="text-xl font-bold text-white">{users.filter(u => u.online).length}</div>
+            <div className="text-white/30 text-xs">Çevrimiçi</div>
           </div>
-          <div
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${
-              user.online ? 'bg-emerald-400' : 'bg-slate-600'
-            }`}
-          />
-        </div>
-        <div>
-          <p className="font-medium text-white text-sm">{user.name}</p>
-          <p className={`text-xs ${user.online ? 'text-emerald-400' : 'text-slate-500'}`}>
-            {user.online ? 'Çevrimiçi' : 'Çevrimdışı'}
-          </p>
+          <div className="bg-white/5 border border-white/8 rounded-2xl p-4 text-center">
+            <div className="text-2xl mb-1">👥</div>
+            <div className="text-xl font-bold text-white">{users.length}</div>
+            <div className="text-white/30 text-xs">Kayıtlı</div>
+          </div>
         </div>
       </div>
-
-      <button
-        onClick={() => onInvite(user.name)}
-        disabled={isInviting}
-        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-          user.online
-            ? 'bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-300 hover:text-indigo-200'
-            : 'bg-white/5 border border-white/10 text-slate-500 cursor-not-allowed'
-        } ${isInviting ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        {isInviting ? (
-          <span className="flex items-center gap-1">
-            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Gönderildi
-          </span>
-        ) : (
-          'Davet Et'
-        )}
-      </button>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value }: { icon: string; label: string; value: number }) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-      <div className="text-2xl mb-1">{icon}</div>
-      <div className="text-xl font-bold text-white">{value}</div>
-      <div className="text-slate-500 text-xs">{label}</div>
     </div>
   );
 }
