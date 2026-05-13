@@ -1,0 +1,246 @@
+// Load .env.local before anything else
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '.env.local');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const key = trimmed.slice(0, idx).trim();
+        const value = trimmed.slice(idx + 1).trim();
+        if (!process.env[key]) process.env[key] = value;
+      }
+    }
+  });
+}
+
+const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const next = require('next');
+const webpush = require('web-push');
+const { v4: uuidv4 } = require('uuid');
+
+const dev = process.env.NODE_ENV !== 'production';
+const app = next({ dev, dir: __dirname });
+const handle = app.getRequestHandler();
+
+// In-memory storage
+const users = new Map(); // name -> { name, subscription, socketId, online }
+const rooms = new Map(); // roomId -> Set of { socketId, name }
+
+// VAPID key setup
+let vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+
+if (!vapidPublicKey || !vapidPrivateKey) {
+  console.log('\n⚠️  No VAPID keys found. Generating temporary keys for this session...');
+  const keys = webpush.generateVAPIDKeys();
+  vapidPublicKey = keys.publicKey;
+  vapidPrivateKey = keys.privateKey;
+  console.log('\n📋 Add these to .env.local for persistent keys:');
+  console.log(`VAPID_PUBLIC_KEY=${vapidPublicKey}`);
+  console.log(`VAPID_PRIVATE_KEY=${vapidPrivateKey}`);
+  console.log('\n');
+}
+
+webpush.setVapidDetails(
+  'mailto:study@studymed.app',
+  vapidPublicKey,
+  vapidPrivateKey
+);
+
+app.prepare().then(() => {
+  const server = express();
+  const httpServer = createServer(server);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST']
+    }
+  });
+
+  server.use(express.json());
+
+  // REST API routes
+  server.get('/api/vapid-key', (req, res) => {
+    res.json({ publicKey: vapidPublicKey });
+  });
+
+  server.post('/api/register', (req, res) => {
+    const { name, subscription } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const existing = users.get(name) || {};
+    users.set(name, {
+      name,
+      subscription: subscription || existing.subscription || null,
+      socketId: existing.socketId || null,
+      online: existing.socketId ? true : false
+    });
+
+    console.log(`✅ Registered user: ${name}`);
+    res.json({ success: true, name });
+  });
+
+  server.get('/api/users', (req, res) => {
+    const userList = Array.from(users.values()).map(u => ({
+      name: u.name,
+      online: u.socketId ? true : false
+    }));
+    res.json(userList);
+  });
+
+  server.post('/api/invite', async (req, res) => {
+    const { fromName, toName, roomId } = req.body;
+    if (!fromName || !toName || !roomId) {
+      return res.status(400).json({ error: 'fromName, toName, and roomId are required' });
+    }
+
+    const targetUser = users.get(toName);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Emit socket event if user is online
+    if (targetUser.socketId) {
+      io.to(targetUser.socketId).emit('invite', {
+        fromName,
+        roomId
+      });
+    }
+
+    // Send push notification if subscription exists
+    if (targetUser.subscription) {
+      const payload = JSON.stringify({
+        title: `📚 ${fromName} ders çalışıyor!`,
+        body: `${fromName} seni ders çalışmaya davet ediyor - Katıl!`,
+        roomId,
+        fromName,
+        icon: '/icon-192.png'
+      });
+
+      try {
+        await webpush.sendNotification(targetUser.subscription, payload);
+        console.log(`📬 Push notification sent to ${toName}`);
+      } catch (err) {
+        console.error(`❌ Push notification failed for ${toName}:`, err.message);
+        // Don't fail the request if push fails
+      }
+    }
+
+    res.json({ success: true });
+  });
+
+  // Socket.io
+  io.on('connection', (socket) => {
+    console.log(`🔌 Socket connected: ${socket.id}`);
+    let currentUserName = null;
+    let currentRoomId = null;
+
+    socket.on('register', (name) => {
+      currentUserName = name;
+      const user = users.get(name);
+      if (user) {
+        user.socketId = socket.id;
+        user.online = true;
+        users.set(name, user);
+      } else {
+        users.set(name, {
+          name,
+          subscription: null,
+          socketId: socket.id,
+          online: true
+        });
+      }
+      console.log(`👤 Socket registered: ${name} (${socket.id})`);
+    });
+
+    socket.on('join-room', ({ roomId, name }) => {
+      currentRoomId = roomId;
+      currentUserName = name;
+
+      if (!rooms.has(roomId)) {
+        rooms.set(roomId, new Map());
+      }
+
+      const room = rooms.get(roomId);
+      const existingMembers = Array.from(room.values());
+
+      // Send existing members to the joiner
+      socket.emit('room-info', { members: existingMembers });
+
+      // Tell existing members about the new joiner
+      existingMembers.forEach(member => {
+        io.to(member.socketId).emit('peer-joined', {
+          socketId: socket.id,
+          name: name
+        });
+      });
+
+      // Add joiner to room
+      room.set(socket.id, { socketId: socket.id, name });
+      socket.join(roomId);
+
+      console.log(`🚪 ${name} joined room ${roomId}. Members: ${room.size}`);
+    });
+
+    socket.on('signal', ({ to, data }) => {
+      io.to(to).emit('signal', { from: socket.id, data });
+    });
+
+    socket.on('leave-room', () => {
+      if (currentRoomId && rooms.has(currentRoomId)) {
+        const room = rooms.get(currentRoomId);
+        room.delete(socket.id);
+        socket.to(currentRoomId).emit('peer-left', { socketId: socket.id, name: currentUserName });
+        socket.leave(currentRoomId);
+
+        if (room.size === 0) {
+          rooms.delete(currentRoomId);
+        }
+        console.log(`🚪 ${currentUserName} left room ${currentRoomId}`);
+        currentRoomId = null;
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log(`🔌 Socket disconnected: ${socket.id} (${currentUserName})`);
+
+      if (currentUserName) {
+        const user = users.get(currentUserName);
+        if (user && user.socketId === socket.id) {
+          user.socketId = null;
+          user.online = false;
+          users.set(currentUserName, user);
+        }
+      }
+
+      if (currentRoomId && rooms.has(currentRoomId)) {
+        const room = rooms.get(currentRoomId);
+        room.delete(socket.id);
+        socket.to(currentRoomId).emit('peer-left', { socketId: socket.id, name: currentUserName });
+
+        if (room.size === 0) {
+          rooms.delete(currentRoomId);
+        }
+      }
+    });
+  });
+
+  // Let Next.js handle all other routes
+  server.all('*', (req, res) => {
+    return handle(req, res);
+  });
+
+  const PORT = process.env.PORT || 3000;
+  httpServer.listen(PORT, () => {
+    console.log(`\n🚀 StudyMed server running at http://localhost:${PORT}`);
+    console.log(`   Environment: ${dev ? 'development' : 'production'}\n`);
+  });
+});
