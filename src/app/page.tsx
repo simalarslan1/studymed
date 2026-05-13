@@ -89,6 +89,10 @@ export default function HomePage() {
       setActiveInvite(data);
     });
 
+    socket.on('users-update', (updatedUsers: User[]) => {
+      setUsers(updatedUsers);
+    });
+
     socket.on('disconnect', () => {
       console.log('Socket disconnected');
     });
@@ -443,16 +447,46 @@ export default function HomePage() {
             <div className="space-y-2">
               {/* Online users first */}
               {onlineUsers.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Çevrimiçi ({onlineUsers.length})</p>
-                  {onlineUsers.map((user) => (
-                    <UserRow
-                      key={user.name}
-                      user={user}
-                      isInviting={invitedFriend === user.name}
-                      onInvite={handleInvite}
-                    />
-                  ))}
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Çevrimiçi ({onlineUsers.length})</p>
+                  <div className="space-y-2">
+                    {onlineUsers.map((user) => (
+                      <button
+                        key={user.name}
+                        onClick={() => handleInvite(user.name)}
+                        disabled={invitedFriend === user.name}
+                        className="w-full flex items-center justify-between p-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50 transition-all duration-200 group disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500/40 to-teal-500/40 border border-emerald-400/30 flex items-center justify-center">
+                              <span className="text-base font-bold text-white">
+                                {user.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-900 animate-pulse" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-white">{user.name}</p>
+                            <p className="text-xs text-emerald-400">Çevrimiçi — tıkla, hemen başla</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-emerald-300 group-hover:text-white transition-colors">
+                          {invitedFriend === user.name ? (
+                            <span className="text-sm flex items-center gap-1">
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Davet gönderildi
+                            </span>
+                          ) : (
+                            <span className="text-sm font-medium">Ders Çalış →</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -461,12 +495,20 @@ export default function HomePage() {
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Çevrimdışı ({offlineUsers.length})</p>
                   {offlineUsers.map((user) => (
-                    <UserRow
-                      key={user.name}
-                      user={user}
-                      isInviting={false}
-                      onInvite={handleInvite}
-                    />
+                    <div key={user.name} className="flex items-center gap-3 p-3 rounded-xl opacity-50">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
+                          <span className="text-sm font-semibold text-slate-400">
+                            {user.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-slate-600 border-2 border-slate-900" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-400 text-sm">{user.name}</p>
+                        <p className="text-xs text-slate-600">Çevrimdışı</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

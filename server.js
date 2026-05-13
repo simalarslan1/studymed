@@ -143,6 +143,11 @@ app.prepare().then(() => {
     let currentUserName = null;
     let currentRoomId = null;
 
+    const broadcastUsers = () => {
+      const userList = Array.from(users.values()).map(u => ({ name: u.name, online: u.online }));
+      io.emit('users-update', userList);
+    };
+
     socket.on('register', (name) => {
       currentUserName = name;
       const user = users.get(name);
@@ -159,6 +164,7 @@ app.prepare().then(() => {
         });
       }
       console.log(`👤 Socket registered: ${name} (${socket.id})`);
+      broadcastUsers();
     });
 
     socket.on('join-room', ({ roomId, name }) => {
@@ -218,6 +224,7 @@ app.prepare().then(() => {
           user.socketId = null;
           user.online = false;
           users.set(currentUserName, user);
+          broadcastUsers();
         }
       }
 
