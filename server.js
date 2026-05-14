@@ -31,6 +31,7 @@ const handle = app.getRequestHandler();
 // In-memory storage
 const users = new Map(); // name -> { name, subscription, socketId, online }
 const rooms = new Map(); // roomId -> Set of { socketId, name }
+const invites = new Map(); // roomId -> { fromName, toName }
 
 // VAPID key setup
 let vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -107,12 +108,12 @@ app.prepare().then(() => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Kaydet — reddetme bildirimi için lazım
+    invites.set(roomId, { fromName, toName });
+
     // Emit socket event if user is online
     if (targetUser.socketId) {
-      io.to(targetUser.socketId).emit('invite', {
-        fromName,
-        roomId
-      });
+      io.to(targetUser.socketId).emit('invite', { fromName, roomId });
     }
 
     // Send push notification if subscription exists
@@ -120,20 +121,29 @@ app.prepare().then(() => {
       const payload = JSON.stringify({
         title: `📚 ${fromName} ders çalışıyor!`,
         body: `${fromName} seni ders çalışmaya davet ediyor - Katıl!`,
-        roomId,
-        fromName,
-        icon: '/icon-192.png'
+        roomId, fromName, icon: '/icon-192.png'
       });
-
       try {
         await webpush.sendNotification(targetUser.subscription, payload);
-        console.log(`📬 Push notification sent to ${toName}`);
       } catch (err) {
-        console.error(`❌ Push notification failed for ${toName}:`, err.message);
-        // Don't fail the request if push fails
+        console.error(`❌ Push failed for ${toName}:`, err.message);
       }
     }
 
+    res.json({ success: true });
+  });
+
+  // Arkadaş "Müsait Değilim" tıkladığında
+  server.post('/api/decline', (req, res) => {
+    const { roomId, fromName } = req.body; // fromName = reddeden kişi (Süeda)
+    const invite = invites.get(roomId);
+    if (!invite) return res.json({ success: true }); // davet expire olmuş
+
+    const inviter = users.get(invite.fromName); // daveti gönderen (Şimal)
+    if (inviter?.socketId) {
+      io.to(inviter.socketId).emit('invite-declined', { byName: fromName });
+    }
+    invites.delete(roomId);
     res.json({ success: true });
   });
 

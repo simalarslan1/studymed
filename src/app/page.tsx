@@ -45,6 +45,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [generatedRoomLink, setGeneratedRoomLink] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [declinedBy, setDeclinedBy] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -63,6 +64,10 @@ export default function HomePage() {
     socket.on('connect', () => socket.emit('register', name));
     socket.on('invite', (data: ActiveInvite) => setActiveInvite(data));
     socket.on('users-update', (updatedUsers: User[]) => setUsers(updatedUsers));
+    socket.on('invite-declined', ({ byName }: { byName: string }) => {
+      setDeclinedBy(byName);
+      setTimeout(() => setDeclinedBy(null), 5000);
+    });
   }, []);
 
   useEffect(() => {
@@ -117,6 +122,18 @@ export default function HomePage() {
   const handleInvite = async (friendName: string) => {
     const roomId = uuidv4();
     setInvitedFriend(friendName);
+
+    const origin = window.location.origin;
+    const roomUrl = `${origin}/room/${roomId}`;
+    const declineUrl = `${origin}/decline/${roomId}?from=${encodeURIComponent(friendName)}`;
+
+    // WhatsApp mesajı — iki seçenekli
+    const waText = encodeURIComponent(
+      `📚 *${userName}* şu an ders çalışıyor!\n\nKatılmak ister misin?\n\n✅ *Müsaitim* → ${roomUrl}\n\n❌ *Müsait değilim* → ${declineUrl}`
+    );
+    window.open(`https://wa.me/?text=${waText}`, '_blank');
+
+    // Uygulama içi bildirim de gönder (site açıksa)
     try {
       await fetch('/api/invite', {
         method: 'POST',
@@ -124,6 +141,7 @@ export default function HomePage() {
         body: JSON.stringify({ fromName: userName, toName: friendName, roomId }),
       });
     } catch {}
+
     router.push(`/room/${roomId}`);
   };
 
@@ -206,6 +224,19 @@ export default function HomePage() {
       {/* Decorative blobs */}
       <div className="fixed top-0 right-0 w-80 h-80 bg-pink-500/8 rounded-full blur-3xl pointer-events-none" />
       <div className="fixed bottom-0 left-0 w-80 h-80 bg-purple-500/8 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Müsait değil bildirimi */}
+      {declinedBy && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-bounce">
+          <div className="bg-[#2a0a3e] border border-pink-500/20 rounded-2xl px-5 py-3.5 shadow-2xl flex items-center gap-3">
+            <span className="text-2xl">😴</span>
+            <div>
+              <p className="text-white font-semibold text-sm">{declinedBy} şu an müsait değil</p>
+              <p className="text-white/40 text-xs">Daha sonra tekrar dene</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invite modal */}
       {activeInvite && (
