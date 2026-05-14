@@ -57,3 +57,17 @@ video {
   border: 2px solid currentColor;
   animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
+
+/* Glow pulse for the main study button */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 30px 6px rgba(236, 72, 153, 0.35), 0 0 60px 12px rgba(168, 85, 247, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 50px 14px rgba(236, 72, 153, 0.55), 0 0 90px 24px rgba(168, 85, 247, 0.35);
+  }
+}
+
+.glow-button {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}

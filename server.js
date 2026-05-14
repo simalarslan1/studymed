@@ -32,6 +32,7 @@ const handle = app.getRequestHandler();
 const users = new Map(); // name -> { name, subscription, socketId, online }
 const rooms = new Map(); // roomId -> Set of { socketId, name }
 const invites = new Map(); // roomId -> { fromName, toName }
+const availabilityMessages = new Map(); // name -> [{ from, time, createdAt }]
 
 // VAPID key setup
 let vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -146,6 +147,44 @@ app.prepare().then(() => {
     invites.delete(roomId);
     res.json({ success: true });
   });
+
+  // ── Availability endpoints ───────────────────────────────────────────────────
+
+  // POST /api/availability
+  server.post('/api/availability', (req, res) => {
+    const { notifyName, from, time } = req.body;
+    if (!notifyName || !from || !time) {
+      return res.status(400).json({ error: 'notifyName, from, and time are required' });
+    }
+    if (!availabilityMessages.has(notifyName)) availabilityMessages.set(notifyName, []);
+    availabilityMessages.get(notifyName).push({ from, time, createdAt: Date.now() });
+
+    // Also notify via socket if online
+    const user = users.get(notifyName);
+    if (user?.socketId) {
+      io.to(user.socketId).emit('availability-update', { from, time });
+    }
+    console.log(`💌 Availability from ${from} for ${notifyName}: ${time}`);
+    res.json({ success: true });
+  });
+
+  // GET /api/messages?name=Şimal
+  server.get('/api/messages', (req, res) => {
+    const { name } = req.query;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const messages = availabilityMessages.get(name) || [];
+    res.json(messages);
+  });
+
+  // DELETE /api/messages?name=Şimal
+  server.delete('/api/messages', (req, res) => {
+    const { name } = req.query;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    availabilityMessages.delete(name);
+    res.json({ success: true });
+  });
+
+  // ── Socket.io ────────────────────────────────────────────────────────────────
 
   // Socket.io
   io.on('connection', (socket) => {
