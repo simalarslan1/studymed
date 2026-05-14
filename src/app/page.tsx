@@ -24,6 +24,14 @@ export default function HomePage() {
   const [showSetup, setShowSetup] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
   const [availabilityMsg, setAvailabilityMsg] = useState<AvailabilityMsg | null>(null);
+  const [showBreakPicker, setShowBreakPicker] = useState(false);
+
+  const BREAK_TIMES = [
+    { label: 'Bugün sabah', emoji: '☀️' },
+    { label: 'Bugün akşam', emoji: '🌆' },
+    { label: 'Yarın sabah', emoji: '🌅' },
+    { label: 'Yarın akşam', emoji: '🌙' },
+  ];
 
   // Setup form state
   const [myName, setMyName] = useState('');
@@ -125,6 +133,15 @@ export default function HomePage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`, '_blank');
     window.open(config.meetLink, '_blank');
     setInviteSent(true);
+  };
+
+  const handleBreakTime = (time: string) => {
+    if (!config) return;
+    const cleanPhone = config.friendPhone.replace(/[^0-9]/g, '');
+    const waText = `☕️ *${config.myName}* şu an ders çalışmıyor.\n\n📅 *${time}* çalışmayı planlıyor!\n\nSeni de bekliyor olacak 📚`;
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`, '_blank');
+    setShowBreakPicker(false);
+    setInviteSent(false);
   };
 
   const handleDismissAvailability = () => {
@@ -270,10 +287,36 @@ export default function HomePage() {
         )}
 
         {/* Main card */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-col items-center gap-6">
-          {!inviteSent ? (
+        <div className="bg-[#160828] border border-purple-900/50 rounded-3xl p-7 flex flex-col items-center gap-5">
+          {showBreakPicker ? (
             <>
-              {/* Big glowing button */}
+              <div className="text-center">
+                <div className="text-4xl mb-2">☕️</div>
+                <h2 className="text-white font-bold text-lg">Ne zaman çalışacaksın?</h2>
+                <p className="text-white/40 text-sm mt-1">{config.friendName}&apos;e WP bildirimi gönderilecek</p>
+              </div>
+              <div className="w-full space-y-2">
+                {BREAK_TIMES.map(({ label, emoji }) => (
+                  <button
+                    key={label}
+                    onClick={() => handleBreakTime(`${emoji} ${label}`)}
+                    className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-gradient-to-r hover:from-pink-600/20 hover:to-purple-600/20 hover:border-pink-500/30 text-white font-medium text-sm transition-all text-left"
+                  >
+                    <span className="text-2xl">{emoji}</span>
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowBreakPicker(false)}
+                className="text-white/30 hover:text-white/60 text-sm transition-all"
+              >
+                ← Geri dön
+              </button>
+            </>
+          ) : !inviteSent ? (
+            <>
+              {/* Ana buton */}
               <button
                 onClick={handleStartStudying}
                 className="w-full py-6 rounded-2xl font-bold text-xl text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 transition-all duration-200 glow-button"
@@ -281,26 +324,41 @@ export default function HomePage() {
                 📚 Ders Çalışmaya Başla
               </button>
 
-              <p className="text-white/35 text-sm text-center leading-relaxed">
-                {config.friendName}&apos;e WhatsApp daveti gönderilir + Meet otomatik açılır
+              {/* Mola butonu */}
+              <button
+                onClick={() => setShowBreakPicker(true)}
+                className="w-full py-3.5 rounded-2xl font-semibold text-white/60 bg-white/5 border border-white/10 hover:bg-white/8 hover:text-white/80 transition-all text-sm flex items-center justify-center gap-2"
+              >
+                ☕️ Mola Zamanı
+              </button>
+
+              <p className="text-white/25 text-xs text-center">
+                Ders başlat → {config.friendName}&apos;e WP + Meet açılır
               </p>
             </>
           ) : (
             <>
-              {/* Confirmation */}
               <div className="text-center space-y-3">
                 <div className="text-5xl">✨</div>
                 <h2 className="text-white font-bold text-xl">{config.friendName}&apos;e davet gönderildi!</h2>
-                <p className="text-white/45 text-sm leading-relaxed">
-                  {config.friendName} &apos;Müsaitim&apos; derse Meet otomatik açılacak.
+                <p className="text-white/45 text-sm">
+                  {config.friendName} &apos;Müsaitim&apos; derse Meet açılacak.
                 </p>
               </div>
-              <button
-                onClick={() => setInviteSent(false)}
-                className="w-full py-3.5 rounded-2xl font-semibold text-white bg-white/8 border border-white/15 hover:bg-white/12 transition-all text-sm"
-              >
-                Yeni Davet Gönder
-              </button>
+              <div className="w-full space-y-2">
+                <button
+                  onClick={() => setInviteSent(false)}
+                  className="w-full py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-pink-600/40 to-purple-600/40 border border-pink-500/30 hover:from-pink-600/60 hover:to-purple-600/60 transition-all text-sm"
+                >
+                  Tekrar Davet Gönder
+                </button>
+                <button
+                  onClick={() => { setInviteSent(false); setShowBreakPicker(true); }}
+                  className="w-full py-3 rounded-2xl font-medium text-white/50 bg-white/5 border border-white/10 hover:text-white/70 transition-all text-sm"
+                >
+                  ☕️ Mola Zamanı
+                </button>
+              </div>
             </>
           )}
         </div>
