@@ -121,7 +121,8 @@ export default function HomePage() {
     const origin = window.location.origin;
     const declineUrl = `${origin}/decline/${sessionId}?for=${encodeURIComponent(config.myName)}&from=${encodeURIComponent(config.friendName)}`;
     const waText = `📚 *${config.myName}* şu an ders çalışıyor!\n\nKatılmak ister misin?\n\n✅ *Müsaitim* → ${config.meetLink}\n\n❌ *Müsait değilim* → ${declineUrl}`;
-    window.open(`https://wa.me/${config.friendPhone}?text=${encodeURIComponent(waText)}`, '_blank');
+    const cleanPhone = config.friendPhone.replace(/[^0-9]/g, ''); // + - boşluk hepsini temizle
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`, '_blank');
     window.open(config.meetLink, '_blank');
     setInviteSent(true);
   };
@@ -136,7 +137,7 @@ export default function HomePage() {
   if (!config || showSetup) {
     const isValid = myName.trim() && friendName.trim() && friendPhone.trim() && meetLink.trim();
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#0f0818]">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: '#0f0818'}}>
         {/* Blobs */}
         <div className="fixed top-0 left-0 w-[500px] h-[500px] bg-pink-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
         <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none" />
@@ -154,7 +155,7 @@ export default function HomePage() {
           </div>
 
           {/* Card */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-7 shadow-2xl space-y-4">
+          <div className="bg-[#160828] border border-purple-900/50 rounded-3xl p-7 shadow-2xl space-y-4">
             {/* Adın */}
             <div>
               <label className="block text-white/60 text-xs font-medium mb-1.5 uppercase tracking-wider">Adın</label>
@@ -163,7 +164,7 @@ export default function HomePage() {
                 value={myName}
                 onChange={e => setMyName(e.target.value)}
                 placeholder="Şimal"
-                className="w-full px-4 py-3.5 bg-white/8 border border-white/15 rounded-2xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all"
+                className="w-full px-4 py-3.5 bg-[#1e0a30] border border-purple-900 rounded-2xl text-white placeholder-purple-400/50 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all"
               />
             </div>
 
@@ -175,7 +176,7 @@ export default function HomePage() {
                 value={friendName}
                 onChange={e => setFriendName(e.target.value)}
                 placeholder="Süeda"
-                className="w-full px-4 py-3.5 bg-white/8 border border-white/15 rounded-2xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all"
+                className="w-full px-4 py-3.5 bg-[#1e0a30] border border-purple-900 rounded-2xl text-white placeholder-purple-400/50 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all"
               />
             </div>
 
@@ -187,7 +188,7 @@ export default function HomePage() {
                 value={friendPhone}
                 onChange={e => setFriendPhone(e.target.value)}
                 placeholder="905551234567 — başında 0 olmadan"
-                className="w-full px-4 py-3.5 bg-white/8 border border-white/15 rounded-2xl text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all text-sm"
+                className="w-full px-4 py-3.5 bg-[#1e0a30] border border-purple-900 rounded-2xl text-white placeholder-purple-400/50 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all text-sm"
               />
             </div>
 
@@ -199,7 +200,7 @@ export default function HomePage() {
                 value={meetLink}
                 onChange={e => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/xxx-xxx-xxx"
-                className="w-full px-4 py-3.5 bg-white/8 border border-white/15 rounded-2xl text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all text-sm"
+                className="w-full px-4 py-3.5 bg-[#1e0a30] border border-purple-900 rounded-2xl text-white placeholder-purple-400/50 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50 transition-all text-sm"
               />
               <p className="text-white/30 text-xs mt-1.5">
                 meet.google.com&apos;da &apos;Yeni Toplantı&apos; oluştur ve linki kopyala
