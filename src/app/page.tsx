@@ -128,17 +128,35 @@ export default function HomePage() {
     const sessionId = uuidv4();
     const origin = window.location.origin;
     const declineUrl = `${origin}/decline/${sessionId}?for=${encodeURIComponent(config.myName)}&from=${encodeURIComponent(config.friendName)}`;
-    const waText = `📚 *${config.myName}* şu an ders çalışıyor!\n\nKatılmak ister misin?\n\n✅ *Müsaitim* → ${config.meetLink}\n\n❌ *Müsait değilim* → ${declineUrl}`;
-    const cleanPhone = config.friendPhone.replace(/[^0-9]/g, ''); // + - boşluk hepsini temizle
+    const cleanPhone = config.friendPhone.replace(/[^0-9]/g, '');
+    // Bold (*) yerine sade metin — WP'ta emoji+bold bazen bozuluyor
+    const lines = [
+      `📚 ${config.myName} şu an ders çalışıyor!`,
+      ``,
+      `Katılmak ister misin?`,
+      ``,
+      `✅ Müsaitim`,
+      config.meetLink,
+      ``,
+      `❌ Müsait değilim`,
+      declineUrl,
+    ];
+    const waText = lines.join('\n');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`, '_blank');
-    window.open(config.meetLink, '_blank');
+    // Meet'i popup yerine butona bırakıyoruz (popup blocker sorununu önler)
     setInviteSent(true);
   };
 
   const handleBreakTime = (time: string) => {
     if (!config) return;
     const cleanPhone = config.friendPhone.replace(/[^0-9]/g, '');
-    const waText = `☕️ *${config.myName}* şu an ders çalışmıyor.\n\n📅 *${time}* çalışmayı planlıyor!\n\nSeni de bekliyor olacak 📚`;
+    const lines = [
+      `☕️ ${config.myName} şu an ders çalışmıyor.`,
+      ``,
+      `${time} çalışmayı planlıyor!`,
+      `Seni de bekliyor olacak 📚`,
+    ];
+    const waText = lines.join('\n');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`, '_blank');
     setShowBreakPicker(false);
     setInviteSent(false);
@@ -346,15 +364,23 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="w-full space-y-2">
+                <a
+                  href={config.meetLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20"
+                >
+                  🎥 Google Meet&apos;e Gir
+                </a>
                 <button
                   onClick={() => setInviteSent(false)}
-                  className="w-full py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-pink-600/40 to-purple-600/40 border border-pink-500/30 hover:from-pink-600/60 hover:to-purple-600/60 transition-all text-sm"
+                  className="w-full py-3 rounded-2xl font-medium text-white/50 bg-white/5 border border-white/10 hover:text-white/70 transition-all text-sm"
                 >
                   Tekrar Davet Gönder
                 </button>
                 <button
                   onClick={() => { setInviteSent(false); setShowBreakPicker(true); }}
-                  className="w-full py-3 rounded-2xl font-medium text-white/50 bg-white/5 border border-white/10 hover:text-white/70 transition-all text-sm"
+                  className="w-full py-3 rounded-2xl font-medium text-white/40 bg-white/5 border border-white/10 hover:text-white/60 transition-all text-sm"
                 >
                   ☕️ Mola Zamanı
                 </button>
